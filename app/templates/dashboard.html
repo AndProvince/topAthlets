@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+    <h2>Dashboard</h2>
+    <p>Welcome, {{ current_user.email }}!</p>
+    {% if not current_user.email_confirmed %}
+        <div class="alert alert-warning">
+            Your email is not confirmed. Please check your inbox.
+        </div>
+    {% endif %}
+{% endblock %}
