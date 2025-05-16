@@ -7,6 +7,76 @@ from .email_utils import send_confirmation_email
 
 auth = Blueprint('auth', __name__)
 
+from functools import wraps
+
+# вспомогательный декоратор, если нет ролей
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_admin:
+            flash('Access denied.', 'danger')
+            return redirect(url_for('auth.login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@auth.route('/admin/users')
+@admin_required
+def admin_users():
+    email_filter = request.args.get('email', '').strip()
+    query = User.query
+    if email_filter:
+        query = query.filter(User.email.ilike(f"%{email_filter}%"))
+    users = query.all()
+    return render_template('admin_users.html', users=users)
+
+@auth.route('/admin/users/block/<int:user_id>')
+@admin_required
+def block_user(user_id):
+    user = User.query.get(user_id)
+    if user:
+        user.active = False
+        db.session.commit()
+        flash(f'User {user.email} blocked.', 'info')
+    return redirect(url_for('auth.admin_users'))
+
+@auth.route('/admin/users/unblock/<int:user_id>')
+@admin_required
+def unblock_user(user_id):
+    user = User.query.get(user_id)
+    if user:
+        user.active = True
+        db.session.commit()
+        flash(f'User {user.email} unblocked.', 'info')
+    return redirect(url_for('auth.admin_users'))
+
+@auth.route('/admin/users/delete/<int:user_id>', methods=['POST'])
+@admin_required
+def delete_user(user_id):
+    user = User.query.get(user_id)
+    if user:
+        if user.id == current_user.id:
+            flash("Нельзя удалить самого себя.", "warning")
+        else:
+            db.session.delete(user)
+            db.session.commit()
+            flash(f"Пользователь {user.email} удалён.", "info")
+    return redirect(url_for('auth.admin_users'))
+
+@auth.route('/admin/users/toggle_admin/<int:user_id>')
+@admin_required
+def toggle_admin(user_id):
+    user = User.query.get(user_id)
+    if user:
+        if user.id == current_user.id:
+            flash("Нельзя снять с себя права администратора.", "warning")
+        else:
+            user.is_admin = not user.is_admin
+            db.session.commit()
+            status = "назначен админом" if user.is_admin else "снят с админов"
+            flash(f"Пользователь {user.email} {status}.", "info")
+    return redirect(url_for('auth.admin_users'))
+
+
 @auth.route('/')
 def home():
     return render_template('home.html')
@@ -45,12 +115,16 @@ def login():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
         if user and user.check_password(form.password.data):
+            if not user.active:
+                flash('Ваш аккаунт заблокирован.', 'danger')
+                return redirect(url_for('auth.login'))
             login_user(user)
             flash('Logged in successfully.', 'success')
             return redirect(url_for('auth.dashboard'))
         else:
             flash('Invalid email or password.', 'danger')
     return render_template('login.html', form=form)
+
 
 @auth.route('/dashboard')
 @login_required
