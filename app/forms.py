@@ -12,3 +12,8 @@ class LoginForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
     submit = SubmitField('Login')
+
+class ProfileForm(FlaskForm):
+    first_name = StringField('First Name', validators=[Length(max=100)])
+    last_name = StringField('Last Name', validators=[Length(max=100)])
+    submit = SubmitField('Save')
