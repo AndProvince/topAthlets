@@ -5,15 +5,15 @@
 {% block content %}
 <div class="container mt-5">
     <h2 class="mb-4">Администрирование пользователей</h2>
-
+    <!-- Форма фильтрации -->
     <form method="GET" class="form-inline mb-3">
-    <input type="text" name="email" class="form-control mr-2" placeholder="Фильтр по email"
-           value="{{ request.args.get('email', '') }}">
-    <button type="submit" class="btn btn-primary">Фильтровать</button>
-    <a href="{{ url_for('auth.admin_users') }}" class="btn btn-secondary ml-2">Сброс</a>
+        <input type="text" name="email" class="form-control mr-2" placeholder="Фильтр по email"
+               value="{{ request.args.get('email', '') }}">
+        <button type="submit" class="btn btn-primary">Фильтровать</button>
+        <a href="{{ url_for('auth.admin_users') }}" class="btn btn-secondary ml-2">Сброс</a>
     </form>
 
-
+    <!-- Таблица пользователей -->
     <table class="table table-bordered table-striped">
         <thead class="thead-dark">
             <tr>

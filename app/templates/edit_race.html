@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Редактировать соревнование{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Редактировать соревнование</h2>
+    <form method="POST" enctype="multipart/form-data">
+        <div class="form-group">
+            <label>Название:</label>
+            <input type="text" name="name" class="form-control" value="{{ race.name }}" required>
+        </div>
+        <div class="form-group">
+            <label>Дата:</label>
+            <input type="date" name="date" class="form-control" value="{{ race.date }}">
+        </div>
+        <div class="form-group">
+            <label>Маршрутный файл (оставьте пустым, если не меняется):</label>
+            <input type="file" name="route_file" class="form-control-file">
+        </div>
+        <div class="form-group">
+            <label>Файл с результатами (оставьте пустым, если не меняется):</label>
+            <input type="file" name="result_file" class="form-control-file">
+        </div>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+        <a href="{{ url_for('auth.all_races') }}" class="btn btn-secondary">Отмена</a>
+    </form>
+</div>
+{% endblock %}

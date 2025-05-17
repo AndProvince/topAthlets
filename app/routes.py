@@ -1,9 +1,15 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
-from .forms import RegisterForm, LoginForm, ProfileForm
-from .models import User
+from .forms import RegisterForm, LoginForm, ProfileForm, RaceForm
+from .models import User, Race
 from . import db
 from .email_utils import send_confirmation_email
+from flask import current_app
+from werkzeug.utils import secure_filename
+import os
+from datetime import datetime
+import uuid
+from flask import send_from_directory
 
 auth = Blueprint('auth', __name__)
 
@@ -120,16 +126,16 @@ def login():
                 return redirect(url_for('auth.login'))
             login_user(user)
             flash('Logged in successfully.', 'success')
-            return redirect(url_for('auth.dashboard'))
+            return redirect(url_for('auth.home'))
         else:
             flash('Invalid email or password.', 'danger')
     return render_template('login.html', form=form)
 
 
-@auth.route('/dashboard')
-@login_required
-def dashboard():
-    return render_template('dashboard.html')
+# @auth.route('/dashboard')
+# @login_required
+# def dashboard():
+#     return render_template('dashboard.html')
 
 @auth.route('/profile', methods=['GET', 'POST'])
 @login_required
@@ -150,3 +156,137 @@ def logout():
     logout_user()
     flash('Logged out successfully.', 'info')
     return redirect(url_for('auth.login'))
+
+@auth.route('/races')
+@login_required
+def all_races():
+    if not current_user.is_admin:
+        return redirect(url_for('auth.login'))
+
+    search_name = request.args.get('name', '', type=str)
+    query = Race.query
+
+    if search_name:
+        query = query.filter(Race.name.ilike(f'%{search_name}%'))
+
+    races = query.order_by(Race.date.desc()).all()
+    return render_template('all_races.html', races=races, search_name=search_name)
+
+
+@auth.route('/races/add', methods=['GET', 'POST'])
+@login_required
+def add_race():
+    if not current_user.is_admin:
+        return redirect(url_for('auth.login'))
+
+    if request.method == 'POST':
+        name = request.form['name']
+        date_str = request.form['date']
+        date = datetime.strptime(date_str, '%Y-%m-%d').date()
+
+        route_file = request.files.get('route_file')
+        result_file = request.files.get('result_file')
+
+        upload_folder = current_app.config['UPLOAD_FOLDER']
+        os.makedirs(upload_folder, exist_ok=True)
+
+        race = Race(name=name, date=date)
+
+        # Сохраняем маршрут
+        if route_file and route_file.filename != '':
+            ext = os.path.splitext(route_file.filename)[1]
+            unique_name = f"{uuid.uuid4().hex}{ext}"
+            route_path = os.path.join(upload_folder, unique_name)
+            route_file.save(route_path)
+            race.route_file = unique_name
+            race.route_file_orig = route_file.filename
+
+        # Сохраняем результаты
+        if result_file and result_file.filename != '':
+            ext = os.path.splitext(result_file.filename)[1]
+            unique_name = f"{uuid.uuid4().hex}{ext}"
+            result_path = os.path.join(upload_folder, unique_name)
+            result_file.save(result_path)
+            race.result_file = unique_name
+            race.result_file_orig = result_file.filename
+
+        db.session.add(race)
+        db.session.commit()
+        return redirect(url_for('auth.all_races'))
+
+    return render_template('add_race.html')
+
+@auth.route('/races/<int:race_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_race(race_id):
+    if not current_user.is_admin:
+        return redirect(url_for('auth.login'))
+
+    race = Race.query.get_or_404(race_id)
+
+    if request.method == 'POST':
+        race.name = request.form['name']
+        date_str = request.form['date']
+        race.date = datetime.strptime(date_str, '%Y-%m-%d').date()
+
+        route_file = request.files.get('route_file')
+        result_file = request.files.get('result_file')
+
+        upload_folder = current_app.config['UPLOAD_FOLDER']
+        os.makedirs(upload_folder, exist_ok=True)
+
+        # Обновляем маршрут, если новый файл
+        if route_file and route_file.filename != '':
+            ext = os.path.splitext(route_file.filename)[1]
+            unique_name = f"{uuid.uuid4().hex}{ext}"
+            route_path = os.path.join(upload_folder, unique_name)
+            route_file.save(route_path)
+            race.route_file = unique_name
+            race.route_file_orig = route_file.filename
+
+        # Обновляем результаты, если новый файл
+        if result_file and result_file.filename != '':
+            ext = os.path.splitext(result_file.filename)[1]
+            unique_name = f"{uuid.uuid4().hex}{ext}"
+            result_path = os.path.join(upload_folder, unique_name)
+            result_file.save(result_path)
+            race.result_file = unique_name
+            race.result_file_orig = result_file.filename
+
+        db.session.commit()
+        return redirect(url_for('auth.all_races'))
+
+    return render_template('edit_race.html', race=race)
+
+
+
+@auth.route('/races/<int:race_id>/delete', methods=['POST'])
+@login_required
+def delete_race(race_id):
+    if not current_user.is_admin:
+        return redirect(url_for('auth.login'))
+
+    race = Race.query.get_or_404(race_id)
+
+    db.session.delete(race)
+    db.session.commit()
+    flash('Соревнование удалено', 'info')
+    return redirect(url_for('auth.all_races'))
+
+
+@auth.route('/download/<filename>')
+@login_required
+def download_file(filename):
+    original_name = request.args.get('original_name', filename)
+
+    # Путь к папке с файлами
+    uploads_dir = current_app.config['UPLOAD_FOLDER']
+
+    # Отдаем файл с оригинальным именем (Content-Disposition)
+    return send_from_directory(
+        uploads_dir,
+        filename,
+        as_attachment=True,
+        download_name=original_name
+    )
+

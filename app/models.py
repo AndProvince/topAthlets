@@ -2,6 +2,7 @@ from . import db
 from flask_login import UserMixin
 from . import login_manager
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import date
 
 
 @login_manager.user_loader
@@ -25,3 +26,16 @@ class User(db.Model, UserMixin):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+class Race(db.Model):
+    __bind_key__ = 'races'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(150), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    route_file = db.Column(db.String(200))  # физическое имя
+    route_file_orig = db.Column(db.String(200))  # оригинальное имя
+    result_file = db.Column(db.String(200))
+    result_file_orig = db.Column(db.String(200))
+
+    def __repr__(self):
+        return f'<Race {self.name}>'

@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block title %}Добавить соревнование{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Добавить новое соревнование</h2>
+
+    <form method="POST" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="name">Название:</label>
+            <input type="text" class="form-control" id="name" name="name" required>
+        </div>
+
+        <div class="form-group">
+            <label for="date">Дата:</label>
+            <input type="date" class="form-control" id="date" name="date" required>
+        </div>
+
+        <div class="form-group">
+            <label for="route_file">Файл маршрута (обязательно):</label>
+            <input type="file" class="form-control-file" id="route_file" name="route_file" required>
+        </div>
+
+        <div class="form-group">
+            <label for="result_file">Файл с результатами (необязательно):</label>
+            <input type="file" class="form-control-file" id="result_file" name="result_file">
+        </div>
+
+        <button type="submit" class="btn btn-success">Сохранить</button>
+        <a href="{{ url_for('auth.all_races') }}" class="btn btn-secondary">Отмена</a>
+    </form>
+</div>
+{% endblock %}

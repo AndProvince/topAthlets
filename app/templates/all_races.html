@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}Список соревнований{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Список соревнований</h2>
+
+    <a href="{{ url_for('auth.add_race') }}" class="btn btn-primary mb-3">Добавить новое соревнование</a>
+
+    <!-- Форма фильтрации -->
+    <form method="GET" class="form-inline mb-3">
+        <input type="text" name="name" class="form-control mr-2" placeholder="Название соревнования" value="{{ search_name }}">
+        <button type="submit" class="btn btn-primary">Поиск</button>
+        {% if search_name %}
+            <a href="{{ url_for('auth.all_races') }}" class="btn btn-secondary ml-2">Сбросить</a>
+        {% endif %}
+    </form>
+
+    {% if races %}
+        <table class="table table-bordered table-striped">
+            <thead class="thead-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>Название</th>
+                    <th>Дата</th>
+                    <th>Файл маршрута</th>
+                    <th>Файл результатов</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for race in races %}
+                <tr>
+                    <td>{{ race.id }}</td>
+                    <td>{{ race.name }}</td>
+                    <td>{{ race.date }}</td>
+                    <td>
+                        {% if race.route_file %}
+                            <a href="{{ url_for('auth.download_file', filename=race.route_file, original_name=race.route_file_orig) }}">
+                                {{ race.route_file_orig }}
+                            </a>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if race.result_file %}
+                            <a href="{{ url_for('auth.download_file', filename=race.result_file, original_name=race.result_file_orig) }}">
+                                {{ race.result_file_orig }}
+                            </a>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('auth.edit_race', race_id=race.id) }}" class="btn btn-sm btn-primary">Редактировать</a>
+                        <form action="{{ url_for('auth.delete_race', race_id=race.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Удалить соревнование?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Удалить</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="alert alert-info">Соревнования не найдены.</div>
+    {% endif %}
+</div>
+{% endblock %}
