@@ -37,5 +37,15 @@ class Race(db.Model):
     result_file = db.Column(db.String(200))
     result_file_orig = db.Column(db.String(200))
 
+    user_links = db.relationship('UserRace', backref='race', lazy='dynamic')
+
     def __repr__(self):
         return f'<Race {self.name}>'
+
+class UserRace(db.Model):
+    __bind_key__ = 'races'
+    __tablename__ = 'user_races'  # обязательно явно указать имя таблицы
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer)  # не ForeignKey, т.к. User в другой БД
+    race_id = db.Column(db.Integer, db.ForeignKey('race.id'))
+

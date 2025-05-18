@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from .forms import RegisterForm, LoginForm, ProfileForm, RaceForm
-from .models import User, Race
+from .models import User, Race, UserRace
 from . import db
 from .email_utils import send_confirmation_email
 from flask import current_app
@@ -10,6 +10,7 @@ import os
 from datetime import datetime
 import uuid
 from flask import send_from_directory
+from sqlalchemy.orm import joinedload
 
 auth = Blueprint('auth', __name__)
 
@@ -85,7 +86,8 @@ def toggle_admin(user_id):
 
 @auth.route('/')
 def home():
-    return render_template('home.html')
+    races = Race.query.order_by(Race.date.desc()).all()
+    return render_template('home.html', races=races)
 
 @auth.route('/register', methods=['GET', 'POST'])
 def register():
@@ -141,13 +143,25 @@ def login():
 @login_required
 def profile():
     form = ProfileForm(obj=current_user)
+
     if form.validate_on_submit():
         current_user.first_name = form.first_name.data
         current_user.last_name = form.last_name.data
         db.session.commit()
         flash('Profile updated successfully.', 'success')
         return redirect(url_for('auth.profile'))
-    return render_template('profile.html', form=form)
+
+    # Получаем все соревнования, в которых участвовал текущий пользователь
+    user_races = (
+        UserRace.query
+        .filter_by(user_id=current_user.id)
+        .options(joinedload(UserRace.race))
+        .all()
+    )
+
+    races = [ur.race for ur in user_races if ur.race is not None]
+
+    return render_template('profile.html', form=form, races=races)
 
 
 @auth.route('/logout')
@@ -289,4 +303,34 @@ def download_file(filename):
         as_attachment=True,
         download_name=original_name
     )
+
+@auth.route('/races/<int:race_id>')
+def race_detail(race_id):
+    race = Race.query.get_or_404(race_id)
+
+    participated = False
+    if current_user.is_authenticated:
+        participated = UserRace.query.filter_by(
+            race_id=race_id,
+            user_id=current_user.id
+        ).first() is not None
+
+    return render_template('race_detail.html', race=race, participated=participated)
+
+@auth.route('/races/<int:race_id>/join', methods=['POST'])
+@login_required
+def join_race(race_id):
+    race = Race.query.get_or_404(race_id)
+
+    # Проверяем, не добавлен ли пользователь уже
+    exists = UserRace.query.filter_by(race_id=race_id, user_id=current_user.id).first()
+    if exists:
+        flash('Вы уже зарегистрированы на это соревнование.', 'info')
+    else:
+        new_link = UserRace(user_id=current_user.id, race_id=race_id)
+        db.session.add(new_link)
+        db.session.commit()
+        flash('Вы успешно зарегистрированы на соревнование!', 'success')
+
+    return redirect(url_for('auth.race_detail', race_id=race_id))
 

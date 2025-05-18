@@ -33,7 +33,12 @@
                 {% for race in races %}
                 <tr>
                     <td>{{ race.id }}</td>
-                    <td>{{ race.name }}</td>
+                    <td>
+                    <a href="{{ url_for('auth.race_detail', race_id=race.id) }}">
+                        {{ race.name }}
+                    </a>
+                    </td>
+
                     <td>{{ race.date }}</td>
                     <td>
                         {% if race.route_file %}
