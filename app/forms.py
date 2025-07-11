@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, DateField
-from wtforms.validators import DataRequired, Email, EqualTo, Length
+from wtforms.validators import DataRequired, Email, EqualTo, Length, Optional
 from flask_wtf.file import FileField, FileAllowed
 
 class RegisterForm(FlaskForm):
@@ -20,9 +20,8 @@ class ProfileForm(FlaskForm):
     submit = SubmitField('Save')
 
 class RaceForm(FlaskForm):
-    name = StringField('Race Name', validators=[DataRequired()])
-    date = DateField('Date', format='%Y-%m-%d', validators=[DataRequired()])
-    route_file = FileField('Route File', validators=[FileAllowed(['gpx', 'txt', 'pdf'])])
-    result_file = FileField('Result File', validators=[FileAllowed(['csv', 'xls', 'xlsx'])])
-    submit = SubmitField('Add Race')
+    name = StringField('Название соревнования', validators=[DataRequired()])
+    date = DateField('Дата проведения', format='%Y-%m-%d', validators=[DataRequired()])
+    clax_file = FileField('Файл результатов (.clax)', validators=[Optional()])
+    submit = SubmitField('Сохранить')
 

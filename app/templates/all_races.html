@@ -24,8 +24,8 @@
                     <th>ID</th>
                     <th>Название</th>
                     <th>Дата</th>
-                    <th>Файл маршрута</th>
-                    <th>Файл результатов</th>
+<!--                    <th>Файл маршрута</th>-->
+                    <th>Файл соревнования</th>
                     <th>Действия</th>
                 </tr>
             </thead>
@@ -40,15 +40,15 @@
                     </td>
 
                     <td>{{ race.date }}</td>
-                    <td>
-                        {% if race.route_file %}
-                            <a href="{{ url_for('auth.download_file', filename=race.route_file, original_name=race.route_file_orig) }}">
-                                {{ race.route_file_orig }}
-                            </a>
-                        {% else %}
-                            —
-                        {% endif %}
-                    </td>
+<!--                    <td>-->
+<!--                        {% if race.route_file %}-->
+<!--                            <a href="{{ url_for('auth.download_file', filename=race.route_file, original_name=race.route_file_orig) }}">-->
+<!--                                {{ race.route_file_orig }}-->
+<!--                            </a>-->
+<!--                        {% else %}-->
+<!--                            —-->
+<!--                        {% endif %}-->
+<!--                    </td>-->
                     <td>
                         {% if race.result_file %}
                             <a href="{{ url_for('auth.download_file', filename=race.result_file, original_name=race.result_file_orig) }}">

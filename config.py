@@ -18,7 +18,11 @@ class Config:
 
     UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'uploads')
     # ROUTE_FOLDER = os.path.join(UPLOAD_FOLDER, 'routes')
-    # RESULTS_FOLDER = os.path.join(UPLOAD_FOLDER, 'results')
+    RESULTS_FOLDER = os.path.join(UPLOAD_FOLDER, 'results')
 
     ALLOWED_EXTENSIONS = {'gpx', 'csv'}
+
+    BASE_POINT = 1000
+    APLHA = 0.65
+    BETA = 0.1
 

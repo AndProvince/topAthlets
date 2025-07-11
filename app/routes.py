@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from .forms import RegisterForm, LoginForm, ProfileForm, RaceForm
-from .models import User, Race, UserRace
+from .models import User, Race, Discipline, UserDiscipline, Participant
 from . import db
 from .email_utils import send_confirmation_email
 from flask import current_app
@@ -11,6 +11,8 @@ from datetime import datetime
 import uuid
 from flask import send_from_directory
 from sqlalchemy.orm import joinedload
+from .utils_clax import parse_clax_and_create_disciplines
+import gpxpy
 
 auth = Blueprint('auth', __name__)
 
@@ -152,14 +154,15 @@ def profile():
         return redirect(url_for('auth.profile'))
 
     # Получаем все соревнования, в которых участвовал текущий пользователь
-    user_races = (
-        UserRace.query
-        .filter_by(user_id=current_user.id)
-        .options(joinedload(UserRace.race))
-        .all()
-    )
+    # user_races = (
+    #     UserDiscipline.query
+    #     .filter_by(user_id=current_user.id)
+    #     .options(joinedload(UserDiscipline.discipline_id))
+    #     .all()
+    # )
 
-    races = [ur.race for ur in user_races if ur.race is not None]
+    # races = [ur.race for ur in user_races if ur.race is not None]
+    races = []
 
     return render_template('profile.html', form=form, races=races)
 
@@ -193,42 +196,35 @@ def add_race():
     if not current_user.is_admin:
         return redirect(url_for('auth.login'))
 
-    if request.method == 'POST':
-        name = request.form['name']
-        date_str = request.form['date']
-        date = datetime.strptime(date_str, '%Y-%m-%d').date()
-
-        route_file = request.files.get('route_file')
-        result_file = request.files.get('result_file')
+    form = RaceForm()
+    if form.validate_on_submit():
+        name = form.name.data
+        date = form.date.data
 
         upload_folder = current_app.config['UPLOAD_FOLDER']
         os.makedirs(upload_folder, exist_ok=True)
 
         race = Race(name=name, date=date)
 
-        # Сохраняем маршрут
-        if route_file and route_file.filename != '':
-            ext = os.path.splitext(route_file.filename)[1]
-            unique_name = f"{uuid.uuid4().hex}{ext}"
-            route_path = os.path.join(upload_folder, unique_name)
-            route_file.save(route_path)
-            race.route_file = unique_name
-            race.route_file_orig = route_file.filename
+        # Сохраняем clax файл
+        clax_file = form.clax_file.data
+        if clax_file:
+            ext = os.path.splitext(clax_file.filename)[-1].lower()
+            if ext != ".clax":
+                flash("Можно загружать только .clax файлы", "danger")
+                return render_template("edit_race.html", form=form, title="Редактировать соревнование")
 
-        # Сохраняем результаты
-        if result_file and result_file.filename != '':
-            ext = os.path.splitext(result_file.filename)[1]
-            unique_name = f"{uuid.uuid4().hex}{ext}"
-            result_path = os.path.join(upload_folder, unique_name)
-            result_file.save(result_path)
-            race.result_file = unique_name
-            race.result_file_orig = result_file.filename
+            unique_filename = f"{uuid.uuid4().hex}{ext}"
+            race.result_file = unique_filename
+            race.result_file_orig = clax_file.filename
+            clax_file.save(os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename))
 
         db.session.add(race)
         db.session.commit()
+        flash("Соревнование добавлено", "success")
         return redirect(url_for('auth.all_races'))
 
-    return render_template('add_race.html')
+    return render_template("edit_race.html", form=form, title="Добавить соревнование")
 
 @auth.route('/races/<int:race_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -238,39 +234,37 @@ def edit_race(race_id):
 
     race = Race.query.get_or_404(race_id)
 
-    if request.method == 'POST':
-        race.name = request.form['name']
-        date_str = request.form['date']
-        race.date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    form = RaceForm(obj=race)
 
-        route_file = request.files.get('route_file')
-        result_file = request.files.get('result_file')
+    if form.validate_on_submit():
+        race.name = form.name.data
+        race.date = form.date.data
 
-        upload_folder = current_app.config['UPLOAD_FOLDER']
-        os.makedirs(upload_folder, exist_ok=True)
+        clax_file = form.clax_file.data
+        if clax_file:
+            ext = os.path.splitext(clax_file.filename)[-1].lower()
+            if ext != ".clax":
+                flash("Можно загружать только .clax файлы", "danger")
+                return render_template("edit_race.html", form=form, title="Редактировать соревнование")
 
-        # Обновляем маршрут, если новый файл
-        if route_file and route_file.filename != '':
-            ext = os.path.splitext(route_file.filename)[1]
-            unique_name = f"{uuid.uuid4().hex}{ext}"
-            route_path = os.path.join(upload_folder, unique_name)
-            route_file.save(route_path)
-            race.route_file = unique_name
-            race.route_file_orig = route_file.filename
+            # Удаляем старый файл при замене (опционально)
+            if race.result_file:
+                try:
+                    os.remove(os.path.join(current_app.config['UPLOAD_FOLDER'], race.result_file))
+                except FileNotFoundError:
+                    pass
 
-        # Обновляем результаты, если новый файл
-        if result_file and result_file.filename != '':
-            ext = os.path.splitext(result_file.filename)[1]
-            unique_name = f"{uuid.uuid4().hex}{ext}"
-            result_path = os.path.join(upload_folder, unique_name)
-            result_file.save(result_path)
-            race.result_file = unique_name
-            race.result_file_orig = result_file.filename
+            # Сохраняем новый файл
+            unique_filename = f"{uuid.uuid4().hex}{ext}"
+            race.result_file = unique_filename
+            race.result_file_orig = clax_file.filename
+            clax_file.save(os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename))
 
         db.session.commit()
+        flash("Соревнование обновлено", "success")
         return redirect(url_for('auth.all_races'))
 
-    return render_template('edit_race.html', race=race)
+    return render_template("edit_race.html", form=form, title="Редактировать соревнование", race=race)
 
 
 
@@ -288,7 +282,7 @@ def delete_race(race_id):
     return redirect(url_for('auth.all_races'))
 
 
-@auth.route('/download/<filename>')
+@auth.route('/download/<path:filename>')
 @login_required
 def download_file(filename):
     original_name = request.args.get('original_name', filename)
@@ -304,33 +298,229 @@ def download_file(filename):
         download_name=original_name
     )
 
-@auth.route('/races/<int:race_id>')
+@auth.route('/races/<int:race_id>', methods=['GET', 'POST'])
+@login_required
 def race_detail(race_id):
     race = Race.query.get_or_404(race_id)
 
-    participated = False
-    if current_user.is_authenticated:
-        participated = UserRace.query.filter_by(
-            race_id=race_id,
-            user_id=current_user.id
-        ).first() is not None
+    disciplines = Discipline.query.filter_by(race_id=race.id).all()
+    parsed = False
 
-    return render_template('race_detail.html', race=race, participated=participated)
+    if request.method == 'POST' and 'analyze_clax' in request.form:
+        if not race.result_file:
+            flash("Для анализа необходимо загрузить clax-файл.", "warning")
+        else:
+            # Вызов функции для разбора clax-файла
+            clax_path = os.path.join(current_app.config['UPLOAD_FOLDER'], race.result_file)
+            try:
+                parsed = parse_clax_and_create_disciplines(clax_path, race)
+                flash("Файл успешно проанализирован.", "success")
+            except Exception as e:
+                flash(f"Ошибка анализа файла: {e}", "danger")
 
-@auth.route('/races/<int:race_id>/join', methods=['POST'])
+        return redirect(url_for('auth.race_detail', race_id=race.id))
+
+    return render_template(
+        'race_detail.html',
+        race=race,
+        disciplines=disciplines,
+        parsed=parsed
+    )
+
+
+@auth.route('/discipline/<int:discipline_id>/upload_gpx', methods=['POST'])
 @login_required
-def join_race(race_id):
-    race = Race.query.get_or_404(race_id)
+def upload_gpx(discipline_id):
+    discipline = Discipline.query.get_or_404(discipline_id)
 
-    # Проверяем, не добавлен ли пользователь уже
-    exists = UserRace.query.filter_by(race_id=race_id, user_id=current_user.id).first()
-    if exists:
-        flash('Вы уже зарегистрированы на это соревнование.', 'info')
-    else:
-        new_link = UserRace(user_id=current_user.id, race_id=race_id)
-        db.session.add(new_link)
+    if 'gpx_file' not in request.files:
+        flash("Файл не был загружен", "danger")
+        return redirect(url_for('auth.race_detail', race_id=discipline.race_id))
+
+    file = request.files['gpx_file']
+
+    if file.filename == '':
+        flash("Имя файла отсутствует", "warning")
+        return redirect(url_for('auth.race_detail', race_id=discipline.race_id))
+
+    if not file.filename.lower().endswith('.gpx'):
+        flash("Допустимы только GPX-файлы", "danger")
+        return redirect(url_for('auth.race_detail', race_id=discipline.race_id))
+
+    try:
+        ext = os.path.splitext(file.filename)[-1]
+        unique_name = f"{uuid.uuid4().hex}{ext}"
+
+        gpx_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'gpx', str(discipline.race_id))
+        os.makedirs(gpx_folder, exist_ok=True)
+
+        file_path = os.path.join(gpx_folder, unique_name)
+        file.save(file_path)
+
+        # сохраняем в дисциплину
+        discipline.route_file = "gpx/" + str(discipline.race_id) + "/" + unique_name
+        discipline.route_file_orig = file.filename
+
+        # очищаем значение коэффицента сложности
+        discipline.difficulty_coefficient = 0
+
         db.session.commit()
-        flash('Вы успешно зарегистрированы на соревнование!', 'success')
+
+        flash("GPX файл успешно загружен", "success")
+
+    except Exception as e:
+        flash(f"Ошибка загрузки файла: {str(e)}", "danger")
+
+    return redirect(url_for('auth.race_detail', race_id=discipline.race_id))
+
+
+@auth.route('/discipline/<int:discipline_id>/delete', methods=['POST'])
+@login_required
+def delete_discipline(discipline_id):
+    discipline = Discipline.query.get_or_404(discipline_id)
+
+    race_id = discipline.race_id
+
+    # Только администратор может удалять дисциплины
+    if not current_user.is_admin:
+        flash("У вас нет прав для удаления дисциплины.", "danger")
+        return redirect(url_for('auth.race_detail', race_id=race_id))
+
+    try:
+        # Удаляем связанные файлы, если есть
+        # if discipline.route_file:
+        #     gpx_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'gpx', str(race_id))
+        #     file_path = os.path.join(gpx_folder, discipline.route_file)
+        #     if os.path.exists(file_path):
+        #         os.remove(file_path)
+        #
+        # if discipline.result_file:
+        #     results_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'results', str(race_id))
+        #     file_path = os.path.join(results_folder, discipline.result_file)
+        #     if os.path.exists(file_path):
+        #         os.remove(file_path)
+
+        # Удаляем дисциплину из базы
+        db.session.delete(discipline)
+        db.session.commit()
+        flash("Дистанция успешно удалена.", "success")
+
+    except Exception as e:
+        flash(f"Ошибка при удалении: {str(e)}", "danger")
 
     return redirect(url_for('auth.race_detail', race_id=race_id))
+
+@auth.route('/disciplines/<int:discipline_id>/participants')
+@login_required
+def view_participants(discipline_id):
+    discipline = Discipline.query.get_or_404(discipline_id)
+    participants = Participant.query.filter_by(discipline_id=discipline.id).order_by(Participant.index).all()
+    return render_template('participants.html', discipline=discipline, participants=participants)
+
+
+@auth.route('/disciplines/<int:discipline_id>/calculate', methods=['POST'])
+@login_required
+def calculate_difficulty(discipline_id):
+    from .utils_RacePoints import calculate_K
+
+    discipline = Discipline.query.get_or_404(discipline_id)
+
+    # Получение данных из формы
+    try:
+        laps = int(request.form.get('laps', 1))
+        ascent_difficulty = float(request.form.get('ascent_difficulty', 0))
+        descent_difficulty = float(request.form.get('descent_difficulty', 0))
+        weather_condition = request.form.get('weather_condition', 'normal')
+    except ValueError:
+        flash('Ошибка в введённых данных. Проверьте значения процентов.', 'danger')
+        return redirect(request.referrer or url_for('auth.race_detail', race_id=discipline.race_id))
+
+    # Алгоритм вычисления коэффициента сложности
+    if discipline.route_file:
+        route_file = os.path.join(current_app.config['UPLOAD_FOLDER'], discipline.route_file)
+
+        gpx = gpxpy.parse(open(route_file, 'r'))
+        elevation_gain_uphill = gpx.get_uphill_downhill().uphill
+        elevation_gain_downhill = gpx.get_uphill_downhill().downhill
+        distance = gpx.get_points_data()[-1].distance_from_start
+
+        # TODO добавить расчет среднего рейтинга участников
+        avg_rating = 500
+
+        K_final, K_base, C_weather, C_comp = calculate_K(
+            distance, elevation_gain_uphill, elevation_gain_downhill, laps,
+            ascent_difficulty, descent_difficulty, weather_condition, avg_rating, discipline.participants_count
+        )
+    else:
+        K_final = 1
+
+    k = round(K_final, 2)
+
+    # Сохраняем в БД
+    discipline.laps = laps
+    discipline.ascent_difficulty_percent = ascent_difficulty
+    discipline.descent_difficulty_percent = descent_difficulty
+    discipline.weather_condition = weather_condition
+    discipline.difficulty_coefficient = k
+
+    db.session.commit()
+
+    flash(f'Коэффициент сложности для {discipline.name} рассчитан: K = {k}', 'success')
+    return redirect(url_for('auth.race_detail', race_id=discipline.race_id))
+
+
+@auth.route('/disciplines/<int:discipline_id>/assign_points', methods=['POST'])
+@login_required
+def assign_points(discipline_id):
+    from .utils_RacePoints import get_sec
+
+    discipline = Discipline.query.get_or_404(discipline_id)
+
+    if not discipline.difficulty_coefficient:
+        flash('Сначала рассчитайте коэффициент сложности маршрута.', 'warning')
+        return redirect(request.referrer or url_for('auth.race_detail', race_id=discipline.race_id))
+
+    # Получаем участников
+    participants = discipline.participants
+
+    # Пример начисления очков — от обратного финишного времени
+    sorted_participants = sorted(participants, key=lambda p: p.time if p.time != "DNF" else "99:99:99")
+    leader_time = get_sec(sorted_participants[0].time)
+
+    base_points = current_app.config['BASE_POINT']
+    alpha = current_app.config['APLHA']
+    beta = current_app.config['BETA']
+
+    for place, participant in enumerate(sorted_participants, start=1):
+        if participant.time == "DNF":
+            participant.point = 0
+            # print(participant.name, 0)
+        else:
+            ratio =  leader_time / get_sec(participant.time)
+            place_coeff = 1 / (1 + beta * (place - 1))
+            participant.point = int(base_points * discipline.difficulty_coefficient * (ratio ** alpha) * place_coeff)
+            # print(participant.name, participant.time, round(base_points * discipline.difficulty_coefficient * (ratio ** alpha), 2), participant.point)
+
+    db.session.commit()
+    flash(f'Очки начислены участникам дисциплины "{discipline.name}".', 'success')
+    return redirect(url_for('auth.race_detail', race_id=discipline.race_id))
+
+
+
+# @auth.route('/races/<int:race_id>/join', methods=['POST'])
+# @login_required
+# def join_race(race_id):
+#     race = Race.query.get_or_404(race_id)
+#
+#     # Проверяем, не добавлен ли пользователь уже
+#     exists = UserRace.query.filter_by(race_id=race_id, user_id=current_user.id).first()
+#     if exists:
+#         flash('Вы уже зарегистрированы на это соревнование.', 'info')
+#     else:
+#         new_link = UserRace(user_id=current_user.id, race_id=race_id)
+#         db.session.add(new_link)
+#         db.session.commit()
+#         flash('Вы успешно зарегистрированы на соревнование!', 'success')
+#
+#     return redirect(url_for('auth.race_detail', race_id=race_id))
 

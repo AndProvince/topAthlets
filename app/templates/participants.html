@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Результаты – {{ discipline.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Результаты: {{ discipline.name }}</h2>
+    <p><strong>Соревнование:</strong> {{ discipline.race.name }}</p>
+
+    {% if participants %}
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered table-hover">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Место</th>
+                        <th>Имя</th>
+                        <th>Номер</th>
+                        <th>Темп</th>
+                        <th>Время</th>
+                        <th>Очки</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in participants %}
+                        <tr>
+                            <td>{{ p.index }}</td>
+                            <td>{{ p.name }}</td>
+                            <td>{{ p.numder }}</td>
+                            <td>{{ p.pace }}</td>
+                            <td>{{ p.time }}</td>
+                            <td>{{ p.point }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="text-muted">Нет участников для этой дистанции.</p>
+    {% endif %}
+
+    <a href="{{ url_for('auth.race_detail', race_id=discipline.race.id) }}" class="btn btn-secondary mt-4">← Назад</a>
+</div>
+{% endblock %}
