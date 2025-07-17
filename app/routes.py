@@ -484,7 +484,7 @@ def assign_points(discipline_id):
     participants = discipline.participants
 
     # Пример начисления очков — от обратного финишного времени
-    sorted_participants = sorted(participants, key=lambda p: p.time if p.time != "DNF" else "99:99:99")
+    sorted_participants = sorted(participants, key=lambda p: p.index)
     leader_time = get_sec(sorted_participants[0].time)
 
     base_points = current_app.config['BASE_POINT']
@@ -497,6 +497,7 @@ def assign_points(discipline_id):
             # print(participant.name, 0)
         else:
             ratio =  leader_time / get_sec(participant.time)
+            ratio = min(ratio, 1 / ratio)
             place_coeff = 1 / (1 + beta * (place - 1))
             participant.point = int(base_points * discipline.difficulty_coefficient * (ratio ** alpha) * place_coeff)
             # print(participant.name, participant.time, round(base_points * discipline.difficulty_coefficient * (ratio ** alpha), 2), participant.point)
