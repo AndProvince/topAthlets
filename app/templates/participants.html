@@ -3,6 +3,14 @@
 
 {% block content %}
 <div class="container mt-4">
+    {% if current_user.is_admin %}
+        <a href="{{ url_for('auth.race_detail', race_id=discipline.race.id) }}" class="btn btn-secondary mt-4">← Назад</a>
+    {% else %}
+        <a href="{{ url_for('auth.home') }}" class="btn btn-secondary mt-4">← Назад</a>
+    {% endif %}
+</div>
+
+<div class="container mt-4">
     <h2>Результаты: {{ discipline.name }}</h2>
     <p><strong>Соревнование:</strong> {{ discipline.race.name }}</p>
 
@@ -37,6 +45,5 @@
         <p class="text-muted">Нет участников для этой дистанции.</p>
     {% endif %}
 
-    <a href="{{ url_for('auth.race_detail', race_id=discipline.race.id) }}" class="btn btn-secondary mt-4">← Назад</a>
 </div>
 {% endblock %}

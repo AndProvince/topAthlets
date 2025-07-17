@@ -37,9 +37,28 @@
                         <p class="card-text">
                             <strong>Дата:</strong> {{ race.date.strftime('%d.%m.%Y') }}
                         </p>
-                        <a href="{{ url_for('auth.race_detail', race_id=race.id) }}" class="btn btn-primary">
-                            Детали соревнования
-                        </a>
+
+                        <!-- Ссылки на дисциплины -->
+                        {% if race.disciplines %}
+                            <p><strong>Дистанции:</strong></p>
+                            <ul>
+                                {% for discipline in race.disciplines %}
+                                    <li>
+                                        <a href="{{ url_for('auth.view_participants', discipline_id=discipline.id) }}">
+                                            {{ discipline.name }}
+                                        </a>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p>Нет дистанций.</p>
+                        {% endif %}
+
+                        {% if current_user.is_admin %}
+                            <a href="{{ url_for('auth.race_detail', race_id=race.id) }}" class="btn btn-primary mt-2">
+                                Детали соревнования
+                            </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -47,5 +66,6 @@
             <p class="ml-3">Соревнования пока не добавлены.</p>
         {% endfor %}
     </div>
+
 </div>
 {% endblock %}

@@ -301,6 +301,10 @@ def download_file(filename):
 @auth.route('/races/<int:race_id>', methods=['GET', 'POST'])
 @login_required
 def race_detail(race_id):
+    if not current_user.is_admin:
+        flash(f'Доступ только для администраторов', 'warning')
+        return redirect(url_for('auth.home'))
+
     race = Race.query.get_or_404(race_id)
 
     disciplines = Discipline.query.filter_by(race_id=race.id).all()
@@ -331,6 +335,10 @@ def race_detail(race_id):
 @auth.route('/discipline/<int:discipline_id>/upload_gpx', methods=['POST'])
 @login_required
 def upload_gpx(discipline_id):
+    if not current_user.is_admin:
+        flash(f'Доступ только для администраторов', 'warning')
+        return redirect(url_for('auth.home'))
+
     discipline = Discipline.query.get_or_404(discipline_id)
 
     if 'gpx_file' not in request.files:
@@ -377,6 +385,10 @@ def upload_gpx(discipline_id):
 @auth.route('/discipline/<int:discipline_id>/delete', methods=['POST'])
 @login_required
 def delete_discipline(discipline_id):
+    if not current_user.is_admin:
+        flash(f'Доступ только для администраторов', 'warning')
+        return redirect(url_for('auth.home'))
+
     discipline = Discipline.query.get_or_404(discipline_id)
 
     race_id = discipline.race_id
@@ -421,6 +433,10 @@ def view_participants(discipline_id):
 @auth.route('/disciplines/<int:discipline_id>/calculate', methods=['POST'])
 @login_required
 def calculate_difficulty(discipline_id):
+    if not current_user.is_admin:
+        flash(f'Доступ только для администраторов', 'warning')
+        return redirect(url_for('auth.home'))
+
     from .utils_RacePoints import calculate_K
 
     discipline = Discipline.query.get_or_404(discipline_id)
@@ -472,6 +488,10 @@ def calculate_difficulty(discipline_id):
 @auth.route('/disciplines/<int:discipline_id>/assign_points', methods=['POST'])
 @login_required
 def assign_points(discipline_id):
+    if not current_user.is_admin:
+        flash(f'Доступ только для администраторов', 'warning')
+        return redirect(url_for('auth.home'))
+
     from .utils_RacePoints import get_sec
 
     discipline = Discipline.query.get_or_404(discipline_id)
