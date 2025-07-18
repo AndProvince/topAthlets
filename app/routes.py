@@ -12,6 +12,7 @@ import uuid
 from flask import send_from_directory
 from sqlalchemy.orm import joinedload
 from .utils_clax import parse_clax_and_create_disciplines
+from .utils_ranking import get_ranking
 import gpxpy
 
 auth = Blueprint('auth', __name__)
@@ -23,7 +24,7 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated or not current_user.is_admin:
-            flash('Access denied.', 'danger')
+            flash('Доступ запрещен', 'danger')
             return redirect(url_for('auth.login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -45,7 +46,7 @@ def block_user(user_id):
     if user:
         user.active = False
         db.session.commit()
-        flash(f'User {user.email} blocked.', 'info')
+        flash(f'Пользователь {user.email} заблокирован', 'info')
     return redirect(url_for('auth.admin_users'))
 
 @auth.route('/admin/users/unblock/<int:user_id>')
@@ -55,7 +56,7 @@ def unblock_user(user_id):
     if user:
         user.active = True
         db.session.commit()
-        flash(f'User {user.email} unblocked.', 'info')
+        flash(f'Пользователь {user.email} разблокирован', 'info')
     return redirect(url_for('auth.admin_users'))
 
 @auth.route('/admin/users/delete/<int:user_id>', methods=['POST'])
@@ -97,14 +98,14 @@ def register():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
         if user:
-            flash('Email already registered.', 'danger')
+            flash('Email уже зарегистрирован', 'danger')
             return redirect(url_for('auth.register'))
         new_user = User(email=form.email.data)
         new_user.set_password(form.password.data)
         db.session.add(new_user)
         db.session.commit()
         send_confirmation_email(new_user)
-        flash('Registration successful. Please check your email to confirm.', 'success')
+        flash('Успешная регистрация. Проверьте email для подтверждения', 'success')
         return redirect(url_for('auth.login'))
     return render_template('register.html', form=form)
 
@@ -114,9 +115,9 @@ def confirm_email(token):
     if user:
         user.email_confirmed = True
         db.session.commit()
-        flash('Email confirmed!', 'success')
+        flash('Email подтвержден', 'success')
     else:
-        flash('Invalid confirmation link.', 'danger')
+        flash('Некорректная ссылка подтверждения', 'danger')
     return redirect(url_for('auth.login'))
 
 @auth.route('/login', methods=['GET', 'POST'])
@@ -129,10 +130,10 @@ def login():
                 flash('Ваш аккаунт заблокирован.', 'danger')
                 return redirect(url_for('auth.login'))
             login_user(user)
-            flash('Logged in successfully.', 'success')
+            flash('Успешный вход', 'success')
             return redirect(url_for('auth.home'))
         else:
-            flash('Invalid email or password.', 'danger')
+            flash('Некорректный логин или пароль', 'danger')
     return render_template('login.html', form=form)
 
 
@@ -150,7 +151,7 @@ def profile():
         current_user.first_name = form.first_name.data
         current_user.last_name = form.last_name.data
         db.session.commit()
-        flash('Profile updated successfully.', 'success')
+        flash('Профиль успешно обновлен', 'success')
         return redirect(url_for('auth.profile'))
 
     # Получаем все соревнования, в которых участвовал текущий пользователь
@@ -171,7 +172,7 @@ def profile():
 @login_required
 def logout():
     logout_user()
-    flash('Logged out successfully.', 'info')
+    flash('Успешный выход', 'info')
     return redirect(url_for('auth.login'))
 
 @auth.route('/races')
@@ -526,7 +527,18 @@ def assign_points(discipline_id):
     flash(f'Очки начислены участникам дисциплины "{discipline.name}".', 'success')
     return redirect(url_for('auth.race_detail', race_id=discipline.race_id))
 
+@auth.route('/ranking', methods=['GET', 'POST'])
+def ranking():
+    search_query = request.args.get('q', '').strip()
 
+    ranking, period_start, period_end = get_ranking(search_query)
+
+    return render_template('ranking.html',
+                           ranking=ranking,
+                           period_start=period_start,
+                           period_end=period_end,
+                           search_query=search_query
+                           )
 
 # @auth.route('/races/<int:race_id>/join', methods=['POST'])
 # @login_required

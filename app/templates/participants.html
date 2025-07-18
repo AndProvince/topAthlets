@@ -6,7 +6,7 @@
     {% if current_user.is_admin %}
         <a href="{{ url_for('auth.race_detail', race_id=discipline.race.id) }}" class="btn btn-secondary mt-4">← Назад</a>
     {% else %}
-        <a href="{{ url_for('auth.home') }}" class="btn btn-secondary mt-4">← Назад</a>
+        <a href="{{ url_for('auth.home') }}" class="btn btn-secondary mt-4">← На главную</a>
     {% endif %}
 </div>
 

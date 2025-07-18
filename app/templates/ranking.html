@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}Рейтинг{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <a href="{{ url_for('auth.home') }}" class="btn btn-secondary mt-4">← На главную</a>
+</div>
+
+<div class="container mt-4">
+    <h2>Общий рейтинг спортсменов</h2>
+    <p class="text-muted">
+        Период расчёта: с {{ period_start.strftime('%d.%m.%Y') }} по {{ period_end.strftime('%d.%m.%Y') }}
+    </p>
+
+    <!-- Форма поиска -->
+    <form method="GET" class="form-inline mb-3">
+        <input type="text" name="q" class="form-control mr-2" placeholder="Поиск по имени..." value="{{ search_query }}">
+        <button type="submit" class="btn btn-primary">Искать</button>
+        {% if search_query %}
+            <a href="{{ url_for('auth.ranking') }}" class="btn btn-outline-secondary ml-2">Сброс</a>
+        {% endif %}
+    </form>
+
+    <table class="table table-striped table-bordered">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Имя спортсмена</th>
+                <th>Количество гонок</th>
+                <th>Всего очков</th>
+<!--                <th>Средний балл</th>-->
+            </tr>
+        </thead>
+        <tbody>
+            {% for athlete in ranking %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ athlete.display_name }}</td>
+                    <td>{{ athlete.num_races }}</td>
+                    <td>{{ "%.2f"|format(athlete.total_points) }}</td>
+<!--                    <td>{{ "%.2f"|format(athlete.total_points / athlete.num_races) }}</td>-->
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted">Ничего не найдено</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
