@@ -65,36 +65,59 @@
                     <tr>
                         <td>{{ d.name }}</td>
                         <td>
+                            <!-- Текущий коэффициент -->
+                            <div class="mb-2">
+                                {% if d.difficulty_coefficient %}
+                                    <span class="badge badge-info">
+                                        Коэффициент: {{ "%.2f"|format(d.difficulty_coefficient) }}
+                                        {% if d.manual_difficulty %}
+                                            <small class="text-muted badge-warning">(введён вручную)</small>
+                                        {% else %}
+                                            <small class="text-muted">
+                                                Кругов: {{ d.laps }},
+                                                Подъем: {{ d.ascent_difficulty_percent }}%,
+                                                Спуск: {{ d.descent_difficulty_percent }}%,
+                                                Погода: {{ d.weather_condition }}
+                                            </small>
+                                        {% endif %}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">Коэффициент не установлен</span>
+                                {% endif %}
+                            </div>
+
+                            <!-- Форма ручного ввода коэффициента -->
+                            <form method="POST" action="{{ url_for('auth.set_difficulty', discipline_id=d.id) }}" class="form-inline mb-2">
+                                <input type="text" name="manual_difficulty"
+                                       class="form-control form-control-sm mr-2"
+                                       pattern="^[0-9]+(\.[0-9]{1,2})?$"
+                                       inputmode="decimal"
+                                       style="width: 80px;"
+                                       value="{{ "%.2f"|format(d.difficulty_coefficient) if d.difficulty_coefficient else '' }}"
+                                       placeholder="1.00"
+                                       required>
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Сохранить</button>
+                            </form>
+
+                            <hr>
+
+                            <!-- GPX-файл -->
                             {% if d.route_file %}
                                 <a href="{{ url_for('auth.download_file', filename=d.route_file, original_name=d.route_file_orig) }}">
                                     {{ d.route_file_orig }}
                                 </a>
-
-                                {% if d.difficulty_coefficient %}
-                                    <div class="mt-1">
-                                        <span class="badge badge-info">K: {{ d.difficulty_coefficient }}</span><br>
-                                        <small class="text-muted">
-                                            Кругов: {{ d.laps }},
-                                            Подъем: {{ d.ascent_difficulty_percent }}%,
-                                            Спуск: {{ d.descent_difficulty_percent }}%,
-                                            Погода: {{ d.weather_condition }}
-                                        </small>
-                                    </div>
-                                {% endif %}
-
                                 <!-- Кнопка: открыть модальное окно -->
                                 <button type="button" class="btn btn-sm btn-outline-success mt-1"
                                         data-toggle="modal" data-target="#difficultyModal{{ d.id }}">
                                     Рассчитать сложность
                                 </button>
-                                <br><hr>
+                                <br>
                                 <small class="text-muted">Заменить:</small>
                             {% else %}
-                                <span class="text-muted">не загружен</span><br>
+                                <span class="text-muted">GPX не загружен</span>
+                                <br>
                                 <small class="text-muted">Загрузить:</small>
                             {% endif %}
-
-                            <!-- Форма загрузки GPX -->
                             <form action="{{ url_for('auth.upload_gpx', discipline_id=d.id) }}" method="POST"
                                   enctype="multipart/form-data" class="form-inline mt-1">
                                 <input type="file" name="gpx_file" class="form-control-file form-control-sm mr-2" required>

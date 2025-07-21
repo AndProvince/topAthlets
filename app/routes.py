@@ -479,11 +479,32 @@ def calculate_difficulty(discipline_id):
     discipline.descent_difficulty_percent = descent_difficulty
     discipline.weather_condition = weather_condition
     discipline.difficulty_coefficient = k
+    discipline.manual_difficulty = False
 
     db.session.commit()
 
     flash(f'Коэффициент сложности для {discipline.name} рассчитан: K = {k}', 'success')
     return redirect(url_for('auth.race_detail', race_id=discipline.race_id))
+
+
+@auth.route('/disciplines/<int:discipline_id>/set_difficulty', methods=['POST'])
+@login_required
+def set_difficulty(discipline_id):
+    discipline = Discipline.query.get_or_404(discipline_id)
+    value = request.form.get('manual_difficulty')
+
+    try:
+        value = float(value)
+
+        discipline.difficulty_coefficient = value
+        discipline.manual_difficulty = True
+        db.session.commit()
+        flash(f'Коэффициент сложности для "{discipline.name}" установлен вручную: {value}', 'success')
+    except ValueError:
+        flash('Неверное значение коэффициента сложности', 'danger')
+
+    return redirect(request.referrer or url_for('auth.race_detail', race_id=discipline.race_id))
+
 
 
 @auth.route('/disciplines/<int:discipline_id>/assign_points', methods=['POST'])

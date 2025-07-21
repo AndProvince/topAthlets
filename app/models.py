@@ -54,9 +54,10 @@ class Discipline(db.Model):
 
     result_file = db.Column(db.String(200))  # Сохранённое имя результатов
     result_file_orig = db.Column(db.String(200))  # Оригинальное имя результатов
-    participants_count = db.Column(db.Integer)  # Количество кругов
+    participants_count = db.Column(db.Integer)  # Количество участников
 
     difficulty_coefficient = db.Column(db.Float)  # Коэффициент сложности (рассчитываемый)
+    manual_difficulty = db.Column(db.Boolean, default=False)
 
     laps = db.Column(db.Integer)  # Количество кругов
     ascent_difficulty_percent = db.Column(db.Integer)  # % сложных подъёмов
